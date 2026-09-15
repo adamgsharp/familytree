@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sharp Family Trees</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Petrona:ital,wght@0,400;0,700;0,800;1,400&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root { --ground: #EEF0EC; --sheet: #F8F9F6; --ink: #1E2A2F; --ink-soft: #52605F; --rule: #C9CFC8; --a: #2F6E8E; --b: #A2392C;
+  --display: "Petrona", Georgia, serif; --body: "Public Sans", "Segoe UI", system-ui, sans-serif; --mono: "IBM Plex Mono", Consolas, monospace; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ground: #151B1E; --sheet: #1C2428; --ink: #E3E8E3; --ink-soft: #9AA7A4; --rule: #34403F; --a: #78B3D1; --b: #E0806F; } }
+:root[data-theme="dark"] { --ground: #151B1E; --sheet: #1C2428; --ink: #E3E8E3; --ink-soft: #9AA7A4; --rule: #34403F; --a: #78B3D1; --b: #E0806F; }
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 16px/1.55 var(--body); margin: 0; padding-inline: 20px; padding-block: 48px 64px; }
+.wrap { max-width: 920px; margin: 0 auto; display: grid; gap: 32px; }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+h1 { font: 800 clamp(36px, 6vw, 60px)/1.02 var(--display); margin: 10px 0 12px; text-wrap: balance; }
+h1 em { font-weight: 400; color: var(--ink-soft); }
+p.lede { margin: 0; color: var(--ink-soft); max-width: 60ch; }
+.trees { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+a.tree { display: grid; gap: 8px; text-decoration: none; color: inherit; background: var(--sheet); border: 1px solid var(--rule); border-top: 4px solid var(--c); border-radius: 4px; padding: 22px; }
+a.tree:hover { border-color: var(--c); }
+a.tree:focus-visible { outline: 2px solid var(--c); outline-offset: 3px; }
+a.tree h2 { font: 700 28px/1.1 var(--display); margin: 0; }
+a.tree p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+a.tree .go { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin-top: 6px; }
+footer { font-size: 13px; color: var(--ink-soft); max-width: 70ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Family history</div>
+    <h1>Sharp family <em>trees</em></h1>
+    <p class="lede">Two lines of ancestry, traced through census, immigration, military and death records. Every person's card shows the records behind them and how strong the evidence is.</p>
+  </header>
+  <section class="trees" aria-label="Family trees">
+    <a class="tree" href="sharp-tredik.html" style="--c: var(--a)">
+      <h2>Sharp &amp; Tredik</h2>
+      <p>Pennsylvania Sharps; Ulster McVickers and a Revolutionary War sergeant; Tvrdíks from Bohemia; Jewish Croners from Magdeburg.</p>
+      <span class="go">Open tree →</span>
+    </a>
+    <a class="tree" href="gochenouer-simm.html" style="--c: var(--b)">
+      <h2>Gochenouer &amp; Simm</h2>
+      <p>Swiss Mennonite Gochnauers to Iowa; a Hakka family from a Guangdong village to Jamaica and Florida.</p>
+      <span class="go">Open tree →</span>
+    </a>
+  </section>
+  <footer>Living people are hidden. Index entries haven't all been checked against original images, so nothing is marked proven; corrections from relatives are welcome.</footer>
+</div>
+</body>
+</html>
