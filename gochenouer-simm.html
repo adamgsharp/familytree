@@ -149,6 +149,29 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
 .read .k { font: 600 15px/1.25 var(--display); }
 .read p { margin: 0; font-size: 13px; color: var(--ink-soft); }
 .read .st { font: 500 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink); }
+
+/* On a phone the left-to-right chart becomes a canvas far wider and taller than the
+   screen, so it is panned in two axes through a keyhole. Below 720px the same markup
+   is re-laid as an indented outline: every card full width, each generation nested one
+   step further in, and the whole thing scrolling in one direction only. */
+@media (max-width: 720px) {
+  .treebox { overflow-x: visible; padding: 16px 14px; }
+  .node { display: block; }
+  /* A button is shrink-to-fit even as a grid container, so `auto` would leave every
+     card ragged to the width of its own name. 100% fills the row it sits in. */
+  .card { width: 100%; }
+  .parents { display: block; padding-left: 17px; margin-top: 9px; border-left: 1px solid var(--rule); }
+  .parents > .node + .node { margin-top: 9px; }
+  .parents::before,
+  .parents > .node::before,
+  .parents > .node:first-child::after,
+  .parents > .node:last-child::after { display: none; }
+  .parents > .node > :first-child { position: relative; }
+  .parents > .node > :first-child::before {
+    content: ""; position: absolute; left: -17px; top: 21px; width: 11px;
+    border-top: 1px solid var(--rule);
+  }
+}
 .stories { background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px; padding: 20px; display: grid; gap: 14px; }
 .stories h2 { font: 700 24px/1.1 var(--display); margin: 0; }
 .stories .reads { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px 28px; }
