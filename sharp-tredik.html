@@ -165,7 +165,10 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
   .zoomctl button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .zoomctl .pct { font: 500 11px/1 var(--mono); color: var(--ink-soft); min-width: 42px;
     text-align: right; font-variant-numeric: tabular-nums; }
-  .treebox { height: 68vh; overflow: auto; padding: 12px; -webkit-overflow-scrolling: touch; }
+  /* pan-x pan-y leaves one-finger scrolling to the browser and hands the two-finger
+     pinch to us, instead of the browser zooming the whole page behind the box. */
+  .treebox { height: 68vh; overflow: auto; padding: 12px; -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y; }
   /* `zoom` rather than a transform, so the scroll box still measures the scaled content
      and both scrollbars behave. */
   .zoomwrap { zoom: var(--z, 1); width: max-content; }
@@ -274,7 +277,7 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
   function drawTree() {
     tree.replaceChildren(el("div", { class: "zoomwrap", id: "zoomwrap" }, node(ROOT, true)));
     sibToggle.hidden = !sibsExist;
-    if (NARROW.matches) fitZoom();
+    if (NARROW.matches) openView();
   }
 
   // Zoom, narrow screens only. `zoom` scales layout rather than painting a transform,
@@ -287,30 +290,91 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
     const pct = document.querySelector(".zoomctl .pct");
     if (pct) pct.textContent = Math.round(z * 100) + "%";
   }
-  function fitZoom() {
+  // Below this the card names (14px) and dates (11px) stop being legible on a phone.
+  const READABLE = 0.8;
+
+  function measure() {
     const w = document.getElementById("zoomwrap");
-    if (!w) return;
+    if (!w) return null;
     w.style.setProperty("--z", 1);
-    // width at 1:1, measured before scaling
-    const natural = w.getBoundingClientRect().width;
-    if (!natural) return;
+    const natural = w.getBoundingClientRect().width;   // width at 1:1, before scaling
+    if (!natural) return null;
     // clientWidth includes the box's padding, which the content cannot use; and the
     // first zoom can add or remove a scrollbar, which changes clientWidth again.
     const cs = getComputedStyle(tree);
-    const avail = () => tree.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+    return { w, cs, fit: () => (tree.clientWidth - parseFloat(cs.paddingLeft)
+      - parseFloat(cs.paddingRight) - 2) / natural };
+  }
+  // The chart is wider than it is tall, so fitting to width leaves the lower half of a
+  // 68vh box empty. Pull the box down to the scaled chart; zooming in releases it again.
+  function snug(m) {
+    const pad = parseFloat(m.cs.paddingTop) + parseFloat(m.cs.paddingBottom);
+    const fitted = m.w.getBoundingClientRect().height + pad + 2;
+    if (fitted < tree.getBoundingClientRect().height) tree.style.height = Math.round(fitted) + "px";
+  }
+  function fitZoom() {
+    const m = measure();
+    if (!m) return;
     tree.style.height = "";
-    setZoom(avail() / natural);
-    requestAnimationFrame(() => {
-      setZoom(avail() / natural);
-      // The chart is wider than it is tall, so fitting to width leaves the lower half of
-      // a 68vh box empty. Pull the box down to the fitted chart; zooming in releases it.
-      const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-      const max = tree.getBoundingClientRect().height;
-      const fitted = w.getBoundingClientRect().height + pad + 2;
-      if (fitted < max) tree.style.height = Math.round(fitted) + "px";
-    });
+    setZoom(m.fit());
+    requestAnimationFrame(() => { tree.style.height = ""; setZoom(m.fit()); snug(m); });
     tree.scrollTop = 0; tree.scrollLeft = 0;
   }
+  // What you get when the page opens on a phone: legible, parked on the root card.
+  // Fitting the whole chart puts it at about 20%, which is a thumbnail, not a chart —
+  // so that is what the Fit button is for, not the first thing you are handed.
+  function openView() {
+    const m = measure();
+    if (!m) return;
+    const go = () => {
+      tree.style.height = "";
+      setZoom(Math.max(m.fit(), READABLE));
+      const rc = document.getElementById("card-" + ROOT.replace(/\W+/g, "-"));
+      if (rc) {
+        const a = rc.getBoundingClientRect(), b = tree.getBoundingClientRect();
+        tree.scrollLeft += a.left - b.left - 12;
+        tree.scrollTop += a.top - b.top - Math.max(0, (tree.clientHeight - a.height) / 2);
+      }
+      snug(m);
+    };
+    go();
+    requestAnimationFrame(go);
+  }
+
+  // Two-finger pinch on the chart itself. Left alone, the browser would zoom the whole
+  // page and the box would go on clipping the chart, so the gesture is taken over here.
+  // scrollLeft/scrollTop are in the box's own scaled pixels, which is what makes the
+  // content point under the fingers computable as (scroll + offset) / z.
+  (function pinch() {
+    let d0 = 0, z0 = 1, mx = 0, my = 0, cx = 0, cy = 0;
+    const gap = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    tree.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 2 || !NARROW.matches) return;
+      const d = gap(e.touches);
+      if (!d) return;
+      const r = tree.getBoundingClientRect();
+      d0 = d; z0 = z;
+      mx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left;
+      my = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+      cx = (tree.scrollLeft + mx) / z;   // the content point under the fingers
+      cy = (tree.scrollTop + my) / z;
+      tree.style.height = "";            // a pinch releases the height Fit pulled in
+      e.preventDefault();
+    }, { passive: false });
+    tree.addEventListener("touchmove", (e) => {
+      if (e.touches.length !== 2 || !d0) return;
+      e.preventDefault();
+      setZoom(z0 * gap(e.touches) / d0);
+      tree.scrollLeft = cx * z - mx;     // hold that point under the fingers
+      tree.scrollTop = cy * z - my;
+    }, { passive: false });
+    const done = (e) => { if (e.touches.length < 2) d0 = 0; };
+    tree.addEventListener("touchend", done);
+    tree.addEventListener("touchcancel", done);
+    // Safari raises its own gesture events alongside the touch ones
+    ["gesturestart", "gesturechange", "gestureend"].forEach((n) =>
+      tree.addEventListener(n, (e) => { if (NARROW.matches) e.preventDefault(); }));
+  })();
 
 
 
