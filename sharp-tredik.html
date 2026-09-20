@@ -150,6 +150,30 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
 .read p { margin: 0; font-size: 13px; color: var(--ink-soft); }
 .read .st { font: 500 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink); }
 
+
+/* A phone cannot hold a pedigree chart: it doubles in width every generation, so no
+   orientation fits seven of them at 375px. Below 720px the chart is replaced by a
+   focused view - the person at the bottom, their parents above, up meaning further
+   back - and you climb a generation by tapping a parent. The crumb trail walks back. */
+@media (max-width: 720px) {
+  .treebox { overflow-x: visible; padding: 16px 14px; }
+  .fv { display: grid; }
+  .fv-row { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); gap: 10px; }
+  .fv-row .card { width: 100%; }
+  .fv-row.subject { justify-content: center; }
+  /* The rail joining a generation to the one below it. */
+  .fv-gap { height: 24px; position: relative; }
+  .fv-gap::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px solid var(--rule); }
+  .card .up { font: 500 10px/1.35 var(--mono); color: var(--ink-soft); text-transform: uppercase; letter-spacing: .07em; }
+  .card[aria-pressed="true"] .up { color: inherit; opacity: .85; }
+  .fv-crumb { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 7px; margin-bottom: 15px;
+              font: 500 11px/1.5 var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+  .fv-crumb .sep { color: var(--ink-soft); }
+  .crumb { background: none; border: 0; padding: 0; font: inherit; color: var(--ink-soft); cursor: pointer;
+           text-decoration: underline; text-underline-offset: 3px; }
+  .crumb:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .crumb.here { color: var(--ink); text-decoration: none; cursor: default; }
+}
 </style>
 </head>
 <body>
@@ -199,6 +223,11 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
   const ROOT = "living-1";
   let selected = ROOT;
   let showSibs = false;
+  let focus = ROOT;                                   // narrow view only: who the tree is centred on
+  const NARROW = window.matchMedia("(max-width: 720px)");
+  // Whether a "Show siblings" toggle would do anything; the focused view never uses it.
+  const rootFamily = new Set([ROOT, ...siblingsOf(ROOT).map(s => s.id)]);
+  const sibsExist = Object.keys(people).some(k => !rootFamily.has(k) && siblingsOf(k).length);
 
   function el(tag, attrs, ...kids) {
     const e = document.createElement(tag);
@@ -209,11 +238,14 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
     return e;
   }
 
-  function card(p) {
+  function card(p, opts) {
+    const o = opts || {};
     return el("button", { class: "card" + (p.photo ? " haspic" : ""), type: "button", id: "card-" + p.id.replace(/\W+/g, "-"),
-      "data-status": p.status, "aria-pressed": String(p.id === selected), style: `--c: ${colorFor(p.branch)}`, onclick: () => select(p.id) },
+      "data-status": p.status, "aria-pressed": String(p.id === selected), style: `--c: ${colorFor(p.branch)}`,
+      onclick: o.onPick || (() => select(p.id)) },
       p.photo ? el("img", { class: "pic", src: p.photo, alt: "", loading: "lazy" }) : [],
-      el("span", { class: "nm" }, p.display), el("span", { class: "yrs" }, years(p)));
+      el("span", { class: "nm" }, p.display), el("span", { class: "yrs" }, years(p)),
+      o.hint ? el("span", { class: "up" }, o.hint) : []);
   }
 
   // Siblings of a person already on the chart: same father and mother, and not an ancestor
@@ -228,7 +260,7 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
     const p = people[name];
     // Always for the root person; for everyone else only when "Show siblings" is on.
     const sibs = (isRoot || showSibs) ? siblingsOf(name) : [];
-    const n = el("div", { class: "node" }, sibs.length ? el("div", { class: "sibs" }, card(p), sibs.map(card)) : card(p));
+    const n = el("div", { class: "node" }, sibs.length ? el("div", { class: "sibs" }, card(p), sibs.map(x => card(x))) : card(p));
     const ps = [p.father, p.mother].filter(x => x && people[x]);
     // NB: ps.map(node) would pass the array index as the second argument, making every
     // mother (index 1) look like the root and silently draw her siblings. Call it plainly.
@@ -236,8 +268,68 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
     return n;
   }
 
+  // How many generations of ancestors sit above someone, so a card can say what is
+  // still up there once it leaves the screen.
+  const depthCache = new Map();
+  function generationsAbove(name) {
+    if (depthCache.has(name)) return depthCache.get(name);
+    depthCache.set(name, 0);  // guard against a cycle in the data
+    const p = people[name];
+    let n = 0;
+    for (const par of [p.father, p.mother]) if (par && people[par]) n = Math.max(n, 1 + generationsAbove(par));
+    depthCache.set(name, n);
+    return n;
+  }
+
+  // The line of descent from the subject up to `target`, used for the crumb trail.
+  function pathTo(target) {
+    const seen = new Set();
+    function walk(name, trail) {
+      if (!name || !people[name] || seen.has(name)) return null;
+      if (name === target) return [...trail, name];
+      seen.add(name);
+      const p = people[name];
+      return walk(p.father, [...trail, name]) || walk(p.mother, [...trail, name]);
+    }
+    return walk(ROOT, []) || [ROOT];
+  }
+
+  function climb(name) {
+    focus = name;
+    drawTree();
+    select(name);
+  }
+
+  function drawFocusView() {
+    const trail = pathTo(focus);
+    const crumb = el("nav", { class: "fv-crumb", "aria-label": "Line of descent back to the start" },
+      trail.flatMap((name, i) => {
+        const here = i === trail.length - 1;
+        const b = here
+          ? el("span", { class: "crumb here", "aria-current": "true" }, people[name].display)
+          : el("button", { class: "crumb", type: "button", onclick: () => climb(name) }, people[name].display);
+        return i ? [el("span", { class: "sep" }, "›"), b] : [b];
+      }));
+
+    const p = people[focus];
+    const parents = [p.father, p.mother].filter(x => x && people[x]);
+    const rows = [];
+    if (parents.length) {
+      rows.push(el("div", { class: "fv-row", style: `--n: ${parents.length}` },
+        parents.map(x => {
+          const up = generationsAbove(x);
+          return card(people[x], { onPick: () => climb(x), hint: up ? `↑ ${up} more above` : "earliest known" });
+        })));
+      rows.push(el("div", { class: "fv-gap" }));
+    }
+    rows.push(el("div", { class: "fv-row subject", style: "--n: 1" }, card(p)));
+    tree.replaceChildren(crumb, el("div", { class: "fv" }, rows));
+  }
+
   function drawTree() {
-    tree.replaceChildren(node(ROOT, true));
+    if (NARROW.matches) drawFocusView();
+    else tree.replaceChildren(node(ROOT, true));
+    sibToggle.hidden = NARROW.matches || !sibsExist;
   }
 
 
@@ -293,8 +385,6 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
   const sibToggle = document.getElementById("sibtoggle");
   // Only offer the toggle when someone beyond the root's own brothers and sisters has recorded siblings;
   // on a tree with none, a button that changes nothing is just confusing.
-  const rootFamily = new Set([ROOT, ...siblingsOf(ROOT).map(s => s.id)]);
-  sibToggle.hidden = !Object.keys(people).some(k => !rootFamily.has(k) && siblingsOf(k).length);
   sibToggle.addEventListener("click", () => {
     showSibs = !showSibs;
     sibToggle.setAttribute("aria-pressed", String(showSibs));
@@ -304,6 +394,7 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
     if (c) c.setAttribute("aria-pressed", "true");
   });
 
+  NARROW.addEventListener("change", drawTree);
   drawTree();
   render();
 })();
