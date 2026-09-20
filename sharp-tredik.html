@@ -95,6 +95,7 @@ h1 em { font-weight: 400; font-style: italic; color: var(--ink-soft); }
 .sibtoggle i { display: inline-block; width: 9px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; flex: none; }
 .sibtoggle[aria-pressed="true"] i { background: currentColor; }
 .sibtoggle[hidden] { display: none; }
+.rel .hasface { margin-left: 5px; font-size: 9px; opacity: .65; vertical-align: 1px; }
 .detail .portrait { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 2px solid var(--c); background: var(--rule); }
 .detail img { cursor: zoom-in; }
     .card .placed { position: absolute; top: 5px; right: 6px; font-size: 10px; line-height: 1; opacity: .75; }
@@ -537,11 +538,18 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
         el("td", {}, value, el("span", { class: "src" }, `${src} · ${status}`)))));
       detail.append(t);
     }
-    const rel = [["Father", p.father], ["Mother", p.mother], ["Spouse", p.spouse]]
+    // Siblings belong here as much as parents do: unless "Show siblings" is pressed they have
+    // no card on the chart at all, and this is then the only way to reach them.
+    const rel = [["Father", p.father], ["Mother", p.mother]]
+      .concat(siblingsOf(p.id).map(s => [isHalf(p, s) ? "Half-brother or sister" : "Brother or sister", s.id]))
+      .concat([["Spouse", p.spouse]])
       .concat(Object.values(people).filter(c => c.father === p.id || c.mother === p.id).map(c => ["Child", c.id]))
       .filter(([, n]) => n && people[n]);
     if (rel.length) detail.append(el("h3", {}, "Family"), el("div", { class: "rel" },
-      rel.map(([r, n]) => el("button", { type: "button", onclick: () => select(n) }, `${r}: ${people[n].display}`))));
+      rel.map(([r, n]) => el("button", { type: "button", onclick: () => select(n) },
+        `${r}: ${people[n].display}`,
+        // A face two clicks away is a face nobody finds. Say which of them has one.
+        people[n].photo ? el("span", { class: "hasface", title: "There is a photograph of them" }, "◉") : []))));
     // p.folded marks a panel whose notes have been written into the life by hand; nothing else is owed.
     const lifeWords = (p.life || []).length ? wordsOf((p.life || []).join(" ")) : null;
     const notes = p.folded ? [] : (lifeWords ? p.notes.filter(x => saysSomethingNew(x, lifeWords, 0.6)) : p.notes);
