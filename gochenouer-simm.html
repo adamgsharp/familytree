@@ -509,12 +509,21 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
   // The life at the top of a panel is the story. A note or a story card that only repeats it is
   // noise, so measure each one against the life and keep it only if it actually adds something.
   const wordsOf = (s) => new Set((s || "").toLowerCase().match(/[a-z0-9]{4,}/g) || []);
-  function saysSomethingNew(text, lifeWords, threshold) {
+  // Distinctive words only: six letters and up, which throws out most of the connective tissue
+  // two pieces of prose about one person inevitably share.
+  const bigWordsOf = (s) => new Set((s || "").toLowerCase().match(/[a-z0-9]{6,}/g) || []);
+  function saysSomethingNew(text, lifeWords, threshold, lifeBig, minNew) {
     const w = wordsOf(text);
     if (!w.size) return false;
     let shared = 0;
     w.forEach((x) => { if (lifeWords.has(x)) shared++; });
-    return shared / w.size < threshold;
+    if (shared / w.size < threshold) return true;
+    // Second chance for the short ones: a card that mostly restates the life still earns its place
+    // if it carries enough that the life simply does not contain.
+    if (!lifeBig || !minNew) return false;
+    let fresh = 0;
+    bigWordsOf(text).forEach((x) => { if (!lifeBig.has(x)) fresh++; });
+    return fresh >= minNew;
   }
 
   function render() {
@@ -578,8 +587,10 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
     // NOT gated on p.folded: that flag says the NOTES were folded into the life by hand, and a
     // story is not a note. The duplicate test below is what keeps a story that only repeats
     // its life from showing, and it is the right test for the job.
+    const lifeBig = lifeWords ? bigWordsOf((p.life || []).join(" ")) : null;
     const stories = (p.stories || []).filter(st => !lifeWords ||
-      saysSomethingNew([st.title, (st.text || []).join(" "), st.quote || ""].join(" "), lifeWords, 0.6));
+      saysSomethingNew([st.title, (st.text || []).join(" "), st.quote || ""].join(" "),
+                       lifeWords, 0.6, lifeBig, 8));
     if (notes.length) detail.append(
       el("h3", {}, lifeWords ? "Also in the record" : "What the records say"),
       el("ul", {}, notes.map(x => el("li", {}, x))));
