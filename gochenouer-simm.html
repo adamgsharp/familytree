@@ -588,7 +588,8 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
     // story is not a note. The duplicate test below is what keeps a story that only repeats
     // its life from showing, and it is the right test for the job.
     const lifeBig = lifeWords ? bigWordsOf((p.life || []).join(" ")) : null;
-    const stories = (p.stories || []).filter(st => !lifeWords ||
+    // "- show: always" in Stories.md overrides the duplicate test for a story AG has approved.
+    const stories = (p.stories || []).filter(st => !lifeWords || st.show === "always" ||
       saysSomethingNew([st.title, (st.text || []).join(" "), st.quote || ""].join(" "),
                        lifeWords, 0.6, lifeBig, 8));
     if (notes.length) detail.append(
