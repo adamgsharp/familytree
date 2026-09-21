@@ -575,7 +575,10 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
     // p.folded marks a panel whose notes have been written into the life by hand; nothing else is owed.
     const lifeWords = (p.life || []).length ? wordsOf((p.life || []).join(" ")) : null;
     const notes = p.folded ? [] : (lifeWords ? p.notes.filter(x => saysSomethingNew(x, lifeWords, 0.6)) : p.notes);
-    const stories = p.folded ? [] : (p.stories || []).filter(st => !lifeWords ||
+    // NOT gated on p.folded: that flag says the NOTES were folded into the life by hand, and a
+    // story is not a note. The duplicate test below is what keeps a story that only repeats
+    // its life from showing, and it is the right test for the job.
+    const stories = (p.stories || []).filter(st => !lifeWords ||
       saysSomethingNew([st.title, (st.text || []).join(" "), st.quote || ""].join(" "), lifeWords, 0.6));
     if (notes.length) detail.append(
       el("h3", {}, lifeWords ? "Also in the record" : "What the records say"),
